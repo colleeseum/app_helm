@@ -7,6 +7,22 @@
 {{- if and (hasKey .Values "image") (ne (default "" .Values.image.username) "") (ne (default "" .Values.image.password) "") -}}
   {{- $pullSecrets = append $pullSecrets (dict "name" (printf "%s-insight-engine-image-pull-secret" .Release.Name)) -}}
 {{- end -}}
+{{- $env := default dict .Values.environmentVariables -}}
+{{- $mergedEnv := merge (dict) $env -}}
+{{- $ingressUrl := default "" .Values.ingress.url -}}
+{{- $ingressEnabled := default false .Values.ingress.enabled -}}
+{{- $scheme := "http" -}}
+{{- if and $ingressEnabled (default false .Values.ingress.tls.enabled) -}}
+  {{- $scheme = "https" -}}
+{{- end -}}
+{{- if and $ingressEnabled (ne $ingressUrl "") -}}
+  {{- if not (hasKey $mergedEnv "STARDOG_ENDPOINT") -}}
+    {{- $_ := set $mergedEnv "STARDOG_ENDPOINT" (printf "%s://sparql.%s" $scheme $ingressUrl) -}}
+  {{- end -}}
+  {{- if not (hasKey $mergedEnv "VBXAPI_ENDPOINT") -}}
+    {{- $_ := set $mergedEnv "VBXAPI_ENDPOINT" (printf "%s://launchpad.%s" $scheme $ingressUrl) -}}
+  {{- end -}}
+{{- end -}}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -79,9 +95,9 @@ spec:
             timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
             failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
           {{- end }}
-          {{- with .Values.environmentVariables }}
+          {{- if $mergedEnv }}
           env:
-            {{- range $key, $value := . }}
+            {{- range $key, $value := $mergedEnv }}
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}

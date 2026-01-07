@@ -144,6 +144,8 @@ certIssuer:
         key: "ca.crt"
 
 environmentVariables: {}
+# Defaults for STARDOG_ENDPOINT and VBXAPI_ENDPOINT are injected when ingress.enabled is true
+# and ingress.url is set, unless explicitly provided here.
 readinessProbe:
   enabled: true
   path: "/"
