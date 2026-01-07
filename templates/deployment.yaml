@@ -1,0 +1,99 @@
+{{- $pullSecrets := list -}}
+{{- if and (hasKey .Values "image") .Values.image.pullSecrets -}}
+  {{- range .Values.image.pullSecrets -}}
+    {{- $pullSecrets = append $pullSecrets . -}}
+  {{- end -}}
+{{- end -}}
+{{- if and (hasKey .Values "image") (ne (default "" .Values.image.username) "") (ne (default "" .Values.image.password) "") -}}
+  {{- $pullSecrets = append $pullSecrets (dict "name" (printf "%s-insight-engine-image-pull-secret" .Release.Name)) -}}
+{{- end -}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "insightengine.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "insightengine.labels.standard" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{ include "insightengine.labels.selector" . | nindent 6 }}
+      app: {{ include "insightengine.fullname" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "insightengine.fullname" . }}
+        {{ include "insightengine.labels.standard" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      securityContext:
+        {{- toYaml .Values.securityContext | nindent 8 }}
+      {{- if gt (len $pullSecrets) 0 }}
+      imagePullSecrets:
+        {{- toYaml $pullSecrets | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ include "insightengine.fullname" . }}
+          image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          {{- with .Values.command }}
+          command:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.args }}
+          args:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ include "insightengine.servicePort" . | int }}
+              protocol: TCP
+          {{- if and .Values.readinessProbe .Values.readinessProbe.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.readinessProbe.path | quote }}
+              port: {{ .Values.readinessProbe.port | quote }}
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+            successThreshold: {{ .Values.readinessProbe.successThreshold }}
+          {{- end }}
+          {{- if and .Values.livenessProbe .Values.livenessProbe.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.livenessProbe.path | quote }}
+              port: {{ .Values.livenessProbe.port | quote }}
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+          {{- end }}
+          {{- with .Values.environmentVariables }}
+          env:
+            {{- range $key, $value := . }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with include "insightengine.podScheduling" . }}
+{{ . | nindent 6 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,173 @@
+# ------------------------------------------------------------------------------
+# Insight Engine Configuration
+# ------------------------------------------------------------------------------
+replicaCount: 1
+podAnnotations: {}
+podLabels: {}
+securityContext:
+  seccompProfile:
+    type: RuntimeDefault
+  runAsNonRoot: true
+  runAsUser: 100000
+  runAsGroup: 100000
+  fsGroup: 100000
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+image:
+  registry: docker.io
+  repository: hashicorp/http-echo
+  tag: latest
+  pullPolicy: IfNotPresent
+  username: ""
+  password: ""
+  pullSecrets: []
+command: []
+args:
+  - "-listen=:3000"
+  - "-text=hello world"
+service:
+  type: ClusterIP
+  port: 3000
+  loadBalancerIP: ""
+  annotations: {}
+ingress:
+  enabled: false
+  className: "nginx"
+  subdomain: "hello-world"
+  url: "example.com"
+  path: "/"
+  pathType: "Prefix"
+  annotations: {}
+  tls:
+    enabled: false
+    secretName: ""
+
+certIssuer:
+  enabled: false
+  # false => namespaced Issuer, true => ClusterIssuer
+  clusterScoped: false
+
+  # If empty, defaults to "{{ .Release.Name }}-certissuer-ie"
+  name: ""
+
+  # One of: selfSigned, acme, ca, vault, cyberArk
+  type: acme
+
+  # =====================
+  # SelfSigned
+  # =====================
+  selfSigned: {}
+
+  # =====================
+  # ACME (Let's Encrypt / ZeroSSL / etc.)
+  # =====================
+  acme:
+    # REQUIRED for ACME
+    email: "helm-admin@stardog.com"
+    # Default is Let's Encrypt production. For staging, use:
+    # https://acme-staging-v02.api.letsencrypt.org/directory
+    server: "https://acme-v02.api.letsencrypt.org/directory"
+    # If empty, defaults to "<issuer-name>-account-key"
+    privateKeySecretName: ""
+
+    # Leave empty to auto-configure HTTP-01 solvers for enabled ingress controllers.
+    # Provide custom entries (e.g., DNS-01) to override the auto-generated solvers.
+    solvers: []
+      # - dns01:
+      #     cloudflare:
+      #       # Secret must contain key "api-token"
+      #       apiTokenSecretRef:
+      #         name: cloudflare-api-token-secret
+      #         key: api-token
+
+  # =====================
+  # CA Issuer
+  # =====================
+  ca:
+    # REQUIRED for CA issuer (name of a Secret with a TLS keypair)
+    secretName: ""
+    # Optional X.509 extensions
+    crlDistributionPoints: []
+    ocspServers: []
+    issuingCertificateURLs: []
+
+  # =====================
+  # Vault Issuer (HashiCorp Vault PKI)
+  # =====================
+  vault:
+    # REQUIRED
+    server: "https://vault.local"
+    path: "pki_int/sign/example-dot-com"
+    # Optional trust for Vault's TLS, base64-encoded PEM (or leave empty to use system roots)
+    caBundle: ""
+    # Choose one auth mechanism below; leave the others empty
+    auth:
+      # 1) Token auth
+      tokenSecretRef:
+        name: ""
+        key: "token"
+      # 2) AppRole auth
+      appRole:
+        path: ""
+        roleId: ""
+        secretRef:
+          name: ""
+          key: "secretId"
+      # 3) Kubernetes/JWT auth
+      kubernetes:
+        mountPath: "/v1/auth/kubernetes"
+        role: ""
+        serviceAccountRef:
+          name: ""
+
+  # =====================
+  # CyberArk (Venafi) Issuer
+  # =====================
+  cyberArk:
+    # REQUIRED
+    zone: "My Application or My CIT"
+
+    # Choose ONE of these: `cloud` (CyberArk Certificate Manager SaaS) OR `tpp` (self-hosted)
+    cloud:
+      apiTokenSecretRef:
+        name: "api-key-secret"
+        key: "apikey"
+
+    tpp:
+      url: "https://tpp.example.com/vedsdk"
+      credentialsRef:
+        name: "tpp-credentials"
+      caBundle: ""
+      caBundleSecretRef:
+        name: "custom-tpp-ca"
+        key: "ca.crt"
+
+environmentVariables: {}
+readinessProbe:
+  enabled: true
+  path: "/"
+  port: http
+  initialDelaySeconds: 2
+  periodSeconds: 5
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
+livenessProbe:
+  enabled: true
+  path: "/"
+  port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "100m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
+nodeSelector: {}
+affinity: {}
+tolerations: []

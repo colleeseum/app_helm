@@ -1,0 +1,35 @@
+{{- if and .Values.ingress.enabled .Values.ingress.tls.enabled (not .Values.certIssuer.enabled) }}
+  {{- if eq (default "" .Values.ingress.tls.secretName) "" }}
+    {{- fail "ingress.tls.secretName must be set when certIssuer is disabled." -}}
+  {{- else }}
+    {{- include "insightengine.ensureSecretExists" (dict "context" $ "name" .Values.ingress.tls.secretName "namespace" .Release.Namespace) }}
+  {{- end }}
+{{- end }}
+
+{{- if .Values.ingress.enabled }}
+  {{- $host := printf "%s.%s" (.Values.ingress.subdomain | default "hello-world") .Values.ingress.url }}
+  {{- $annotations := dict }}
+  {{- if .Values.certIssuer.enabled }}
+    {{- if eq (include "certIssuer.kind" .) "ClusterIssuer" }}
+      {{- $_ := set $annotations "cert-manager.io/cluster-issuer" (include "certIssuer.name.ie" .) -}}
+    {{- else }}
+      {{- $_ := set $annotations "cert-manager.io/issuer" (include "certIssuer.name.ie" .) -}}
+    {{- end }}
+  {{- end }}
+  {{- $merged := merge $annotations (default dict .Values.ingress.annotations) }}
+  {{- $tls := list }}
+  {{- if .Values.ingress.tls.enabled }}
+    {{- $tls = list (dict "hosts" (list $host) "secretName" (include "certIssuer.secretName.ie" .)) }}
+  {{- end }}
+  {{- $paths := list (dict "path" .Values.ingress.path "pathType" .Values.ingress.pathType "backend" (dict "service" (dict "name" (include "insightengine.fullname" .) "port" (dict "number" (include "insightengine.servicePort" . | int))))) }}
+  {{- $rules := list (dict "host" $host "http" (dict "paths" $paths)) }}
+{{- printf "%s\n" (include "insightengine.ingressResource" (dict
+      "context" .
+      "name" (include "insightengine.fullname" .)
+      "className" .Values.ingress.className
+      "annotations" $merged
+      "extraLabels" (dict "app" (include "insightengine.fullname" .))
+      "rules" $rules
+      "tls" $tls
+  )) }}
+{{- end }}
